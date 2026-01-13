@@ -69,11 +69,6 @@ const Enrollments = () => {
         <Button onClick={handleOpenModal}>+ Create Enrollment</Button>
       </div>
 
-      <div className="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-8 rounded-lg shadow-lg mb-6">
-        <h2 className="text-2xl font-semibold mb-3">Enrollment Information</h2>
-       <p className="opacity-95">Select a student, course, and semester to create a new enrollment.</p>
-      </div>
-
       <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-6">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">

@@ -1,15 +1,44 @@
-import React, { useState } from 'react';
-import { useStudents, useCreateStudent, useUpdateStudent, useDeleteStudent } from '../../hooks/useStudents';
-import { useSemesters } from '../../hooks/useSemesters';
+import React, { useState } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '../ui/dialog';
-import { Button } from '../ui/button';
-import { toast } from 'sonner';
+  useStudents,
+  useCreateStudent,
+  useUpdateStudent,
+  useDeleteStudent,
+} from "../../hooks/useStudents";
+import { useSemesters } from "../../hooks/useSemesters";
+import { Formik, Form, Field, FieldArray } from "formik";
+import * as Yup from "yup";
+import {
+  Modal,
+  Button,
+  Table,
+  Space,
+  message,
+  Select,
+  Input,
+  Popconfirm,
+  Tag,
+} from "antd";
+import { EditOutlined, DeleteOutlined, PlusOutlined } from "@ant-design/icons";
+
+const validationSchema = Yup.object({
+  name: Yup.string()
+    .required("Name is required")
+    .min(2, "Name must be at least 2 characters"),
+  semesterId: Yup.string().required("Semester is required"),
+  phoneNumbers: Yup.array().of(
+    Yup.object({
+      phone: Yup.string()
+        .matches(/^[0-9\-\+\s\(\)]*$/, "Invalid phone number format")
+        .required("Phone number is required"),
+    })
+  ),
+  addresses: Yup.array().of(
+    Yup.object({
+      address: Yup.string().required("Address is required"),
+    })
+  ),
+});
 
 const Students = () => {
   const { data: students, isLoading, error } = useStudents();
@@ -20,297 +49,383 @@ const Students = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    semesterId: '',
-    phoneNumbers: [{ phone: '' }],
-    addresses: [{ address: '' }],
-  });
 
   const handleOpenModal = (student = null) => {
-    if (student) {
-      setEditingStudent(student);
-      setFormData({
-        name: student.name || '',
-        semesterId: student.semesterId || '',
-        phoneNumbers: student.phoneNumbers?.length > 0 
-          ? student.phoneNumbers 
-          : [{ phone: '' }],
-        addresses: student.addresses?.length > 0 
-          ? student.addresses 
-          : [{ address: '' }],
-      });
-    } else {
-      setEditingStudent(null);
-      setFormData({
-        name: '',
-        semesterId: '',
-        phoneNumbers: [{ phone: '' }],
-        addresses: [{ address: '' }],
-      });
-    }
+    setEditingStudent(student || null);
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingStudent(null);
-    setFormData({
-      name: '',
-      semesterId: '',
-      phoneNumbers: [{ phone: '' }],
-      addresses: [{ address: '' }],
-    });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (values, { setSubmitting }) => {
     try {
       const data = {
-        name: formData.name,
-        semesterId: formData.semesterId,
-        phoneNumbers: formData.phoneNumbers.filter(p => p.phone.trim() !== ''),
-        addresses: formData.addresses.filter(a => a.address.trim() !== ''),
+        name: values.name,
+        semesterId: values.semesterId,
+        phoneNumbers: values.phoneNumbers.filter((p) => p.phone.trim() !== ""),
+        addresses: values.addresses.filter((a) => a.address.trim() !== ""),
       };
 
       if (editingStudent) {
         await updateStudent.mutateAsync({ id: editingStudent.id, data });
-        toast.success('Student updated successfully!');
+        message.success("Student updated successfully!");
       } else {
         await createStudent.mutateAsync(data);
-        toast.success('Student created successfully!');
+        message.success("Student created successfully!");
       }
       handleCloseModal();
     } catch (error) {
-      console.error('Error saving student:', error);
-      toast.error('Error saving student. Please try again.');
+      message.error("Error saving student. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this student?')) {
-      try {
-        await deleteStudent.mutateAsync(id);
-        toast.success('Student deleted successfully!');
-      } catch (error) {
-        console.error('Error deleting student:', error);
-        toast.error('Error deleting student. Please try again.');
-      }
+    try {
+      await deleteStudent.mutateAsync(id);
+      message.success("Student deleted successfully!");
+    } catch (error) {
+      message.error("Error deleting student. Please try again.");
     }
   };
 
-  const addPhoneNumber = () => {
-    setFormData({
-      ...formData,
-      phoneNumbers: [...formData.phoneNumbers, { phone: '' }],
-    });
-  };
+  const columns = [
+    {
+      title: "Name",
+      dataIndex: "name",
+      key: "name",
+    },
+    {
+      title: "Semester",
+      dataIndex: "semesterId",
+      key: "semester",
+      render: (semesterId) => {
+        const semester = semesters?.find((s) => s.id === semesterId);
+        return semester?.semester || "N/A";
+      },
+    },
+    {
+      title: "Phone Numbers",
+      dataIndex: "phoneNumbers",
+      key: "phoneNumbers",
+      render: (phoneNumbers) => (
+        <>
+          {phoneNumbers?.map((p, i) => (
+            <Tag key={i} color="blue">
+              {p.phone}
+            </Tag>
+          ))}
+        </>
+      ),
+    },
+    {
+      title: "Addresses",
+      dataIndex: "addresses",
+      key: "addresses",
+      render: (addresses) => (
+        <>
+          {addresses?.map((a, i) => (
+            <Tag key={i} color="green">
+              {a.address}
+            </Tag>
+          ))}
+        </>
+      ),
+    },
+    {
+      title: "Actions",
+      key: "actions",
+      render: (_, record) => (
+        <Space size="small">
+          <Button
+            type="primary"
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => handleOpenModal(record)}
+          >
+            Edit
+          </Button>
+          <Popconfirm
+            title="Delete Student"
+            description="Are you sure you want to delete this student?"
+            onConfirm={() => handleDelete(record.id)}
+            okText="Yes"
+            cancelText="No"
+          >
+            <Button danger size="small" icon={<DeleteOutlined />}>
+              Delete
+            </Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
 
-  const removePhoneNumber = (index) => {
-    setFormData({
-      ...formData,
-      phoneNumbers: formData.phoneNumbers.filter((_, i) => i !== index),
-    });
-  };
+  if (isLoading)
+    return (
+      <div style={{ padding: "40px", textAlign: "center" }}>
+        Loading students...
+      </div>
+    );
+  if (error)
+    return (
+      <div style={{ padding: "40px", textAlign: "center", color: "red" }}>
+        Error loading students: {error.message}
+      </div>
+    );
 
-  const updatePhoneNumber = (index, value) => {
-    const newPhoneNumbers = [...formData.phoneNumbers];
-    newPhoneNumbers[index].phone = value;
-    setFormData({ ...formData, phoneNumbers: newPhoneNumbers });
+  const initialValues = editingStudent || {
+    name: "",
+    semesterId: "",
+    phoneNumbers: [{ phone: "" }],
+    addresses: [{ address: "" }],
   };
-
-  const addAddress = () => {
-    setFormData({
-      ...formData,
-      addresses: [...formData.addresses, { address: '' }],
-    });
-  };
-
-  const removeAddress = (index) => {
-    setFormData({
-      ...formData,
-      addresses: formData.addresses.filter((_, i) => i !== index),
-    });
-  };
-
-  const updateAddress = (index, value) => {
-    const newAddresses = [...formData.addresses];
-    newAddresses[index].address = value;
-    setFormData({ ...formData, addresses: newAddresses });
-  };
-
-  if (isLoading) return <div className="p-10 text-center text-lg">Loading students...</div>;
-  if (error) return <div className="p-10 text-center text-lg text-red-500">Error loading students: {error.message}</div>;
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Students Management</h1>
-        <Button onClick={() => handleOpenModal()}>+ Add Student</Button>
+    <div style={{ padding: "24px" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "24px",
+        }}
+      >
+        <h1 style={{ fontSize: "24px", fontWeight: "bold", margin: 0 }}>
+          Students Management
+        </h1>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => handleOpenModal()}
+        >
+          Add Student
+        </Button>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-gradient-to-r from-purple-500 to-purple-600 text-white">
-                <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Name</th>
-                <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Semester</th>
-                <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Phone Numbers</th>
-                <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Addresses</th>
-                <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {students && students.length > 0 ? (
-                students.map((student) => {
-                  const semester = semesters?.find(s => s.id === student.semesterId);
-                  return (
-                    <tr key={student.id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-4 text-gray-700">{student.name}</td>
-                      <td className="px-4 py-4 text-gray-700">{semester?.semester || 'N/A'}</td>
-                      <td className="px-4 py-4">
-                        <div className="flex flex-wrap gap-2">
-                          {student.phoneNumbers?.map((p, i) => (
-                            <span key={i} className="inline-block px-3 py-1 bg-indigo-100 text-indigo-700 rounded-md text-xs font-medium">
-                              {p.phone}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex flex-wrap gap-2">
-                          {student.addresses?.map((a, i) => (
-                            <span key={i} className="inline-block px-3 py-1 bg-indigo-100 text-indigo-700 rounded-md text-xs font-medium">
-                              {a.address}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={() => handleOpenModal(student)}>
-                            Edit
-                          </Button>
-                          <Button variant="destructive" size="sm" onClick={() => handleDelete(student.id)}>
-                            Delete
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              ) : (
-                <tr>
-                  <td colSpan="5" className="px-4 py-10 text-center text-gray-500 italic">No students found</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <Table
+        columns={columns}
+        dataSource={students}
+        rowKey="id"
+        pagination={{ pageSize: 10 }}
+        scroll={{ x: 1200 }}
+      />
 
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>{editingStudent ? 'Edit Student' : 'Add New Student'}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Name *</label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                required
-              />
-            </div>
+      <Modal
+        title={editingStudent ? "Edit Student" : "Add New Student"}
+        open={isModalOpen}
+        onCancel={handleCloseModal}
+        footer={null}
+        width={600}
+      >
+        <Formik
+          initialValues={initialValues}
+          validationSchema={validationSchema}
+          onSubmit={handleSubmit}
+          enableReinitialize={true}
+        >
+          {({ values, errors, touched, isSubmitting, isValid, setFieldValue  }) => (
+            <Form style={{ marginTop: "20px" }}>
+              <div style={{ marginBottom: "16px" }}>
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: "8px",
+                    fontWeight: 500,
+                  }}
+                >
+                  Name *
+                </label>
+                <Field
+                  as={Input}
+                  name="name"
+                  placeholder="Enter student name"
+                  status={errors.name && touched.name ? "error" : ""}
+                />
+                {errors.name && touched.name && (
+                  <div
+                    style={{
+                      color: "#ff4d4f",
+                      fontSize: "12px",
+                      marginTop: "4px",
+                    }}
+                  >
+                    {errors.name}
+                  </div>
+                )}
+              </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Semester *</label>
-              <select
-                value={formData.semesterId}
-                onChange={(e) => setFormData({ ...formData, semesterId: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                required
+              <div style={{ marginBottom: "16px" }}>
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: "8px",
+                    fontWeight: 500,
+                  }}
+                >
+                  Semester *
+                </label>
+
+                <Select
+                  style={{ width: "100%" }}
+                  placeholder="Select Semester"
+                  value={values.semesterId || undefined}
+                  onChange={(value) => {
+                    setFieldValue("semesterId", value);
+                  }}
+                  options={
+                    semesters?.map((s) => ({
+                      value: String(s.id),
+                      label: s.semester,
+                    })) || []
+                  }
+                  status={
+                    errors.semesterId && touched.semesterId ? "error" : ""
+                  }
+                />
+
+                {errors.semesterId && touched.semesterId && (
+                  <div
+                    style={{
+                      color: "#ff4d4f",
+                      fontSize: "12px",
+                      marginTop: "4px",
+                    }}
+                  >
+                    {errors.semesterId}
+                  </div>
+                )}
+              </div>
+
+              <FieldArray name="phoneNumbers">
+                {({ push, remove }) => (
+                  <div style={{ marginBottom: "16px" }}>
+                    <label
+                      style={{
+                        display: "block",
+                        marginBottom: "8px",
+                        fontWeight: 500,
+                      }}
+                    >
+                      Phone Numbers *
+                    </label>
+                    {values.phoneNumbers.map((phone, index) => (
+                      <div
+                        key={index}
+                        style={{
+                          display: "flex",
+                          gap: "8px",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        <Field
+                          as={Input}
+                          name={`phoneNumbers.${index}.phone`}
+                          placeholder="Phone number"
+                          status={
+                            errors.phoneNumbers?.[index]?.phone &&
+                            touched.phoneNumbers?.[index]?.phone
+                              ? "error"
+                              : ""
+                          }
+                        />
+                        {values.phoneNumbers.length > 1 && (
+                          <Button
+                            danger
+                            icon={<DeleteOutlined />}
+                            onClick={() => remove(index)}
+                          />
+                        )}
+                      </div>
+                    ))}
+                    <Button
+                      type="dashed"
+                      onClick={() => push({ phone: "" })}
+                      style={{ width: "100%" }}
+                    >
+                      + Add Phone Number
+                    </Button>
+                  </div>
+                )}
+              </FieldArray>
+
+              <FieldArray name="addresses">
+                {({ push, remove }) => (
+                  <div style={{ marginBottom: "16px" }}>
+                    <label
+                      style={{
+                        display: "block",
+                        marginBottom: "8px",
+                        fontWeight: 500,
+                      }}
+                    >
+                      Addresses *
+                    </label>
+                    {values.addresses.map((address, index) => (
+                      <div
+                        key={index}
+                        style={{
+                          display: "flex",
+                          gap: "8px",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        <Field
+                          as={Input}
+                          name={`addresses.${index}.address`}
+                          placeholder="Address"
+                          status={
+                            errors.addresses?.[index]?.address &&
+                            touched.addresses?.[index]?.address
+                              ? "error"
+                              : ""
+                          }
+                        />
+                        {values.addresses.length > 1 && (
+                          <Button
+                            danger
+                            icon={<DeleteOutlined />}
+                            onClick={() => remove(index)}
+                          />
+                        )}
+                      </div>
+                    ))}
+                    <Button
+                      type="dashed"
+                      onClick={() => push({ address: "" })}
+                      style={{ width: "100%" }}
+                    >
+                      + Add Address
+                    </Button>
+                  </div>
+                )}
+              </FieldArray>
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: "8px",
+                }}
               >
-                <option value="">Select Semester</option>
-                {semesters?.map((semester) => (
-                  <option key={semester.id} value={semester.id}>
-                    {semester.semester}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Phone Numbers *</label>
-              {formData.phoneNumbers.map((phone, index) => (
-                <div key={index} className="flex gap-2">
-                  <input
-                    type="text"
-                    value={phone.phone}
-                    onChange={(e) => updatePhoneNumber(index, e.target.value)}
-                    placeholder="Phone number"
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                  {formData.phoneNumbers.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => removePhoneNumber(index)}
-                    >
-                      Remove
-                    </Button>
-                  )}
-                </div>
-              ))}
-              <Button type="button" variant="outline" size="sm" onClick={addPhoneNumber}>
-                + Add Phone Number
-              </Button>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Addresses *</label>
-              {formData.addresses.map((address, index) => (
-                <div key={index} className="flex gap-2">
-                  <input
-                    type="text"
-                    value={address.address}
-                    onChange={(e) => updateAddress(index, e.target.value)}
-                    placeholder="Address"
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                  {formData.addresses.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => removeAddress(index)}
-                    >
-                      Remove
-                    </Button>
-                  )}
-                </div>
-              ))}
-              <Button type="button" variant="outline" size="sm" onClick={addAddress}>
-                + Add Address
-              </Button>
-            </div>
-
-            <DialogFooter>
-              <Button type="button" variant="secondary" onClick={handleCloseModal}>
-                Cancel
-              </Button>
-              <Button type="submit">
-                {editingStudent ? 'Update' : 'Create'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+                <Button onClick={handleCloseModal}>Cancel</Button>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={isSubmitting}
+                  disabled={!isValid || isSubmitting}
+                >
+                  {editingStudent ? "Update" : "Create"}
+                </Button>
+              </div>
+            </Form>
+          )}
+        </Formik>
+      </Modal>
     </div>
   );
 };

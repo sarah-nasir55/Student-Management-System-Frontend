@@ -6,8 +6,8 @@ import Students from './components/Students/Students';
 import Semesters from './components/Semesters/Semesters';
 import Courses from './components/Courses/Courses';
 import Enrollments from './components/Enrollments/Enrollments';
-import { Toaster } from './components/ui/toaster';
 import './App.css';
+
 // Create a client for React Query
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,7 +33,6 @@ function App() {
           </Routes>
         </Dashboard>
       </Router>
-      <Toaster />
     </QueryClientProvider>
   );
 }

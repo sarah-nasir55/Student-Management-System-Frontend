@@ -1,176 +1,282 @@
-import React, { useState } from 'react';
-import { useEnrollment, useEnrollments } from '../../hooks/useEnrollments';
-import { useStudents } from '../../hooks/useStudents';
-import { useCourses } from '../../hooks/useCourses';
-import { useSemesters } from '../../hooks/useSemesters';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '../ui/dialog';
-import { Button } from '../ui/button';
-import { toast } from 'sonner';
+import React, { useState } from "react";
+import { useEnrollment, useEnrollments } from "../../hooks/useEnrollments";
+import { useStudents } from "../../hooks/useStudents";
+import { useCourses } from "../../hooks/useCourses";
+import { useSemesters } from "../../hooks/useSemesters";
+import { Formik, Form, Field } from "formik";
+import * as Yup from "yup";
+import { Modal, Button, Table, message, Select } from "antd";
+import { PlusOutlined } from "@ant-design/icons";
+
+const validationSchema = Yup.object({
+  studentId: Yup.string().required("Student is required"),
+  courseId: Yup.string().required("Course is required"),
+  semesterId: Yup.string().required("Semester is required"),
+});
 
 const Enrollments = () => {
-  const { data: enrollments, isLoading: enrollmentsLoading, error: enrollmentsError } = useEnrollments();
+  const {
+    data: enrollments,
+    isLoading: enrollmentsLoading,
+    error: enrollmentsError,
+  } = useEnrollments();
   const { data: students, isLoading: studentsLoading } = useStudents();
   const { data: courses, isLoading: coursesLoading } = useCourses();
   const { data: semesters, isLoading: semestersLoading } = useSemesters();
   const createEnrollment = useEnrollment();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    studentId: '',
-    courseId: '',
-    semesterId: '',
-  });
 
   const handleOpenModal = () => {
-    setFormData({
-      studentId: '',
-      courseId: '',
-      semesterId: '',
-    });
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
-    setFormData({
-      studentId: '',
-      courseId: '',
-      semesterId: '',
-    });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (values, { setSubmitting }) => {
     try {
-      await createEnrollment.mutateAsync(formData);
+      await createEnrollment.mutateAsync(values);
       handleCloseModal();
-      toast.success('Enrollment created successfully!');
+      message.success("Enrollment created successfully!");
     } catch (error) {
-      console.error('Error creating enrollment:', error);
-      toast.error('Error creating enrollment. Please try again.');
+      console.error("Error creating enrollment:", error);
+      message.error("Error creating enrollment. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const isLoading = studentsLoading || coursesLoading || semestersLoading || enrollmentsLoading;
+  const isLoading =
+    studentsLoading || coursesLoading || semestersLoading || enrollmentsLoading;
 
-  if (isLoading) return <div className="p-10 text-center text-lg">Loading data...</div>;
-  if (enrollmentsError) return <div className="p-10 text-center text-lg text-red-500">Error loading enrollments: {enrollmentsError.message}</div>;
+  if (isLoading)
+    return (
+      <div style={{ padding: "40px", textAlign: "center" }}>
+        Loading data...
+      </div>
+    );
+  if (enrollmentsError)
+    return (
+      <div style={{ padding: "40px", textAlign: "center", color: "red" }}>
+        Error loading enrollments: {enrollmentsError.message}
+      </div>
+    );
+
+  const columns = [
+    {
+      title: "Student",
+      dataIndex: "studentName",
+      key: "student",
+    },
+    {
+      title: "Course",
+      dataIndex: "courseName",
+      key: "course",
+    },
+    {
+      title: "Semester",
+      dataIndex: "semesterName",
+      key: "semester",
+    },
+  ];
+
+  const initialValues = {
+    studentId: "",
+    courseId: "",
+    semesterId: "",
+  };
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Student Enrollments</h1>
-        <Button onClick={handleOpenModal}>+ Create Enrollment</Button>
+    <div style={{ padding: "24px" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "24px",
+        }}
+      >
+        <h1 style={{ fontSize: "24px", fontWeight: "bold", margin: 0 }}>
+          Student Enrollments
+        </h1>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={handleOpenModal}
+        >
+          Create Enrollment
+        </Button>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-6">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-gradient-to-r from-purple-500 to-purple-600 text-white">
-                <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Student</th>
-                <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Course</th>
-                <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Semester</th>
-              </tr>
-            </thead>
-            <tbody>
-              {enrollments && enrollments.length > 0 ? (
-                enrollments.map((enrollment) => (
-                  <tr
-                    key={enrollment.enrollmentId}
-                    className="border-b border-gray-200 hover:bg-gray-50 transition-colors"
+      <Table
+        columns={columns}
+        dataSource={enrollments?.map((e) => ({ ...e, key: e.enrollmentId }))}
+        rowKey="enrollmentId"
+        pagination={{ pageSize: 10 }}
+        scroll={{ x: 1000 }}
+      />
+
+      <Modal
+        title="Create New Enrollment"
+        open={isModalOpen}
+        onCancel={handleCloseModal}
+        footer={null}
+        width={500}
+      >
+        <Formik
+          initialValues={initialValues}
+          validationSchema={validationSchema}
+          onSubmit={handleSubmit}
+          enableReinitialize={true}
+        >
+          {({
+            values,
+            errors,
+            touched,
+            isSubmitting,
+            isValid,
+            setFieldValue,
+          }) => (
+            <Form style={{ marginTop: "20px" }}>
+              <div style={{ marginBottom: "16px" }}>
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: "8px",
+                    fontWeight: 500,
+                  }}
+                >
+                  Student *
+                </label>
+                <Field
+                  className="w-full"
+                  as={Select}
+                  name="studentId"
+                  placeholder="Select Student"
+                  value={values.studentId || undefined}
+                  onChange={(value) => setFieldValue("studentId", value)}
+                  status={errors.studentId && touched.studentId ? "error" : ""}
+                  options={
+                    students?.map((s) => ({
+                      value: s.id,
+                      label: s.name,
+                    })) || []
+                  }
+                />
+                {errors.studentId && touched.studentId && (
+                  <div
+                    style={{
+                      color: "#ff4d4f",
+                      fontSize: "12px",
+                      marginTop: "4px",
+                    }}
                   >
-                    <td className="px-4 py-4 text-gray-700 font-medium">{enrollment.studentName}</td>
-                    <td className="px-4 py-4 text-gray-700">{enrollment.courseName}</td>
-                    <td className="px-4 py-4 text-gray-700">{enrollment.semesterName}</td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="3" className="px-4 py-10 text-center text-gray-500 italic">
-                    No enrollments found
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                    {errors.studentId}
+                  </div>
+                )}
+              </div>
 
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Create New Enrollment</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Student *</label>
-              <select
-                value={formData.studentId}
-                onChange={(e) => setFormData({ ...formData, studentId: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                required
+              <div style={{ marginBottom: "16px" }}>
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: "8px",
+                    fontWeight: 500,
+                  }}
+                >
+                  Course *
+                </label>
+                <Field
+                  className="w-full"
+                  as={Select}
+                  name="courseId"
+                  placeholder="Select Course"
+                  value={values.courseId || undefined}
+                  onChange={(value) => setFieldValue("courseId", value)}
+                  status={errors.courseId && touched.courseId ? "error" : ""}
+                  options={
+                    courses?.map((c) => ({
+                      value: c.id,
+                      label: `${c.name} - ${c.instructor}`,
+                    })) || []
+                  }
+                />
+                {errors.courseId && touched.courseId && (
+                  <div
+                    style={{
+                      color: "#ff4d4f",
+                      fontSize: "12px",
+                      marginTop: "4px",
+                    }}
+                  >
+                    {errors.courseId}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ marginBottom: "16px" }}>
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: "8px",
+                    fontWeight: 500,
+                  }}
+                >
+                  Semester *
+                </label>
+                <Field
+                  className="w-full"
+                  as={Select}
+                  name="semesterId"
+                  placeholder="Select Semester"
+                  value={values.semesterId || undefined}
+                  onChange={(value) => setFieldValue("semesterId", value)}
+                  status={
+                    errors.semesterId && touched.semesterId ? "error" : ""
+                  }
+                  options={
+                    semesters?.map((s) => ({
+                      value: s.id,
+                      label: s.semester,
+                    })) || []
+                  }
+                />
+                {errors.semesterId && touched.semesterId && (
+                  <div
+                    style={{
+                      color: "#ff4d4f",
+                      fontSize: "12px",
+                      marginTop: "4px",
+                    }}
+                  >
+                    {errors.semesterId}
+                  </div>
+                )}
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: "8px",
+                }}
               >
-                <option value="">Select Student</option>
-                {students?.map((student) => (
-                  <option key={student.id} value={student.id}>
-                    {student.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Course *</label>
-              <select
-                value={formData.courseId}
-                onChange={(e) => setFormData({ ...formData, courseId: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                required
-              >
-                <option value="">Select Course</option>
-                {courses?.map((course) => (
-                  <option key={course.id} value={course.id}>
-                    {course.name} - {course.instructor}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Semester *</label>
-              <select
-                value={formData.semesterId}
-                onChange={(e) => setFormData({ ...formData, semesterId: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                required
-              >
-                <option value="">Select Semester</option>
-                {semesters?.map((semester) => (
-                  <option key={semester.id} value={semester.id}>
-                    {semester.semester}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <DialogFooter>
-              <Button type="button" variant="secondary" onClick={handleCloseModal}>
-                Cancel
-              </Button>
-              <Button type="submit">
-                Create Enrollment
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+                <Button onClick={handleCloseModal}>Cancel</Button>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={isSubmitting}
+                  disabled={!isValid || isSubmitting}
+                >
+                  Create Enrollment
+                </Button>
+              </div>
+            </Form>
+          )}
+        </Formik>
+      </Modal>
     </div>
   );
 };

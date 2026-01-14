@@ -20,7 +20,6 @@ const apiRequest = async (endpoint, options = {}) => {
     throw new Error(`API Error: ${response.status} ${response.statusText}`);
   }
 
-  // Handle empty responses
   const text = await response.text();
   return text ? JSON.parse(text) : null;
 };

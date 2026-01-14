@@ -1,15 +1,38 @@
-import React, { useState } from 'react';
-import { useCourses, useCreateCourse, useUpdateCourse, useDeleteCourse } from '../../hooks/useCourses';
-import { useSemesters } from '../../hooks/useSemesters';
+import React, { useState } from "react";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '../ui/dialog';
-import { Button } from '../ui/button';
-import { toast } from 'sonner';
+  useCourses,
+  useCreateCourse,
+  useUpdateCourse,
+  useDeleteCourse,
+} from "../../hooks/useCourses";
+import { useSemesters } from "../../hooks/useSemesters";
+import { Formik, Form, Field } from "formik";
+import * as Yup from "yup";
+import {
+  Modal,
+  Button,
+  Table,
+  Space,
+  message,
+  Select,
+  Input,
+  Popconfirm,
+} from "antd";
+import { EditOutlined, DeleteOutlined, PlusOutlined } from "@ant-design/icons";
+
+const validationSchema = Yup.object({
+  name: Yup.string()
+    .required("Course name is required")
+    .min(2, "Name must be at least 2 characters"),
+  instructor: Yup.string()
+    .required("Instructor is required")
+    .min(2, "Instructor name must be at least 2 characters"),
+  creditHours: Yup.number()
+    .required("Credit hours is required")
+    .min(1, "Credit hours must be at least 1")
+    .max(10, "Credit hours must be less than 10"),
+  semesterId: Yup.string().required("Semester is required"),
+});
 
 const Courses = () => {
   const { data: courses, isLoading, error } = useCourses();
@@ -20,202 +43,333 @@ const Courses = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    instructor: '',
-    creditHours: '',
-    semesterId: '',
-  });
 
   const handleOpenModal = (course = null) => {
-    if (course) {
-      setEditingCourse(course);
-      setFormData({
-        name: course.name || '',
-        instructor: course.instructor || '',
-        creditHours: course.creditHours?.toString() || '',
-        semesterId: course.semesterId || '',
-      });
-    } else {
-      setEditingCourse(null);
-      setFormData({
-        name: '',
-        instructor: '',
-        creditHours: '',
-        semesterId: '',
-      });
-    }
+    setEditingCourse(course || null);
     setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditingCourse(null);
-    setFormData({
-      name: '',
-      instructor: '',
-      creditHours: '',
-      semesterId: '',
-    });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (values, { setSubmitting }) => {
     try {
       const data = {
-        ...formData,
-        creditHours: parseInt(formData.creditHours),
+        ...values,
+        creditHours: parseInt(values.creditHours),
       };
 
       if (editingCourse) {
         await updateCourse.mutateAsync({ id: editingCourse.id, data });
-        toast.success('Course updated successfully!');
+        message.success("Course updated successfully!");
       } else {
         await createCourse.mutateAsync(data);
-        toast.success('Course created successfully!');
+        message.success("Course created successfully!");
       }
       handleCloseModal();
     } catch (error) {
-      console.error('Error saving course:', error);
-      toast.error('Error saving course. Please try again.');
+      console.error("Error saving course:", error);
+      message.error("Error saving course. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this course?')) {
-      try {
-        await deleteCourse.mutateAsync(id);
-        toast.success('Course deleted successfully!');
-      } catch (error) {
-        console.error('Error deleting course:', error);
-        toast.error('Error deleting course. Please try again.');
-      }
+    try {
+      await deleteCourse.mutateAsync(id);
+      message.success("Course deleted successfully!");
+    } catch (error) {
+      console.error("Error deleting course:", error);
+      message.error("Error deleting course. Please try again.");
     }
   };
 
-  if (isLoading) return <div className="p-10 text-center text-lg">Loading courses...</div>;
-  if (error) return <div className="p-10 text-center text-lg text-red-500">Error loading courses: {error.message}</div>;
+  if (isLoading)
+    return (
+      <div style={{ padding: "40px", textAlign: "center" }}>
+        Loading courses...
+      </div>
+    );
+  if (error)
+    return (
+      <div style={{ padding: "40px", textAlign: "center", color: "red" }}>
+        Error loading courses: {error.message}
+      </div>
+    );
+
+  const columns = [
+    {
+      title: "Name",
+      dataIndex: "name",
+      key: "name",
+    },
+    {
+      title: "Instructor",
+      dataIndex: "instructor",
+      key: "instructor",
+    },
+    {
+      title: "Credit Hours",
+      dataIndex: "creditHours",
+      key: "creditHours",
+    },
+    {
+      title: "Semester",
+      dataIndex: "semesterId",
+      key: "semester",
+      render: (semesterId) => {
+        const semester = semesters?.find((s) => s.id === semesterId);
+        return semester?.semester || "N/A";
+      },
+    },
+    {
+      title: "Actions",
+      key: "actions",
+      render: (_, record) => (
+        <Space size="small">
+          <Button
+            type="primary"
+            size="small"
+            icon={<EditOutlined />}
+            onClick={() => handleOpenModal(record)}
+          >
+            Edit
+          </Button>
+          <Popconfirm
+            title="Delete Course"
+            description="Are you sure you want to delete this course?"
+            onConfirm={() => handleDelete(record.id)}
+            okText="Yes"
+            cancelText="No"
+          >
+            <Button danger size="small" icon={<DeleteOutlined />}>
+              Delete
+            </Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
+  const initialValues = editingCourse || {
+    name: "",
+    instructor: "",
+    creditHours: "",
+    semesterId: "",
+  };
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Courses Management</h1>
-        <Button onClick={() => handleOpenModal()}>+ Add Course</Button>
+    <div style={{ padding: "24px" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "24px",
+        }}
+      >
+        <h1 style={{ fontSize: "24px", fontWeight: "bold", margin: 0 }}>
+          Courses Management
+        </h1>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => handleOpenModal()}
+        >
+          Add Course
+        </Button>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-gradient-to-r from-purple-500 to-purple-600 text-white">
-                <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Name</th>
-                <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Instructor</th>
-                <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Credit Hours</th>
-                <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Semester</th>
-                <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {courses && courses.length > 0 ? (
-                courses.map((course) => {
-                  const semester = semesters?.find(s => s.id === course.semesterId);
-                  return (
-                    <tr key={course.id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-4 text-gray-700">{course.name}</td>
-                      <td className="px-4 py-4 text-gray-700">{course.instructor}</td>
-                      <td className="px-4 py-4 text-gray-700">{course.creditHours}</td>
-                      <td className="px-4 py-4 text-gray-700">{semester?.semester || 'N/A'}</td>
-                      <td className="px-4 py-4">
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={() => handleOpenModal(course)}>
-                            Edit
-                          </Button>
-                          <Button variant="destructive" size="sm" onClick={() => handleDelete(course.id)}>
-                            Delete
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              ) : (
-                <tr>
-                  <td colSpan="5" className="px-4 py-10 text-center text-gray-500 italic">No courses found</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <Table
+        columns={columns}
+        dataSource={courses}
+        rowKey="id"
+        pagination={{ pageSize: 10 }}
+        scroll={{ x: 1200 }}
+      />
 
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>{editingCourse ? 'Edit Course' : 'Add New Course'}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Course Name *</label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                required
-              />
-            </div>
+      <Modal
+        title={editingCourse ? "Edit Course" : "Add New Course"}
+        open={isModalOpen}
+        onCancel={handleCloseModal}
+        footer={null}
+        width={600}
+      >
+        <Formik
+          initialValues={initialValues}
+          validationSchema={validationSchema}
+          onSubmit={handleSubmit}
+          enableReinitialize={true}
+        >
+          {({
+            values,
+            errors,
+            touched,
+            isSubmitting,
+            isValid,
+            setFieldValue,
+          }) => (
+            <Form style={{ marginTop: "20px" }}>
+              <div style={{ marginBottom: "16px" }}>
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: "8px",
+                    fontWeight: 500,
+                  }}
+                >
+                  Course Name *
+                </label>
+                <Field
+                  as={Input}
+                  name="name"
+                  placeholder="Enter course name"
+                  status={errors.name && touched.name ? "error" : ""}
+                />
+                {errors.name && touched.name && (
+                  <div
+                    style={{
+                      color: "#ff4d4f",
+                      fontSize: "12px",
+                      marginTop: "4px",
+                    }}
+                  >
+                    {errors.name}
+                  </div>
+                )}
+              </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Instructor *</label>
-              <input
-                type="text"
-                value={formData.instructor}
-                onChange={(e) => setFormData({ ...formData, instructor: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                required
-              />
-            </div>
+              <div style={{ marginBottom: "16px" }}>
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: "8px",
+                    fontWeight: 500,
+                  }}
+                >
+                  Instructor *
+                </label>
+                <Field
+                  as={Input}
+                  name="instructor"
+                  placeholder="Enter instructor name"
+                  status={
+                    errors.instructor && touched.instructor ? "error" : ""
+                  }
+                />
+                {errors.instructor && touched.instructor && (
+                  <div
+                    style={{
+                      color: "#ff4d4f",
+                      fontSize: "12px",
+                      marginTop: "4px",
+                    }}
+                  >
+                    {errors.instructor}
+                  </div>
+                )}
+              </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Credit Hours *</label>
-              <input
-                type="number"
-                min="1"
-                value={formData.creditHours}
-                onChange={(e) => setFormData({ ...formData, creditHours: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                required
-              />
-            </div>
+              <div style={{ marginBottom: "16px" }}>
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: "8px",
+                    fontWeight: 500,
+                  }}
+                >
+                  Credit Hours *
+                </label>
+                <Field
+                  as={Input}
+                  name="creditHours"
+                  type="number"
+                  min="1"
+                  max="10"
+                  placeholder="Enter credit hours"
+                  status={
+                    errors.creditHours && touched.creditHours ? "error" : ""
+                  }
+                />
+                {errors.creditHours && touched.creditHours && (
+                  <div
+                    style={{
+                      color: "#ff4d4f",
+                      fontSize: "12px",
+                      marginTop: "4px",
+                    }}
+                  >
+                    {errors.creditHours}
+                  </div>
+                )}
+              </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">Semester *</label>
-              <select
-                value={formData.semesterId}
-                onChange={(e) => setFormData({ ...formData, semesterId: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                required
+              <div style={{ marginBottom: "16px" }}>
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: "8px",
+                    fontWeight: 500,
+                  }}
+                >
+                  Semester *
+                </label>
+                <Field
+                  className="w-full"
+                  as={Select}
+                  name="semesterId"
+                  value={values.semesterId || undefined}
+                  onChange={(value) => {
+                    setFieldValue("semesterId", value);
+                  }}
+                  placeholder="Select Semester"
+                  status={
+                    errors.semesterId && touched.semesterId ? "error" : ""
+                  }
+                  options={
+                    semesters?.map((s) => ({
+                      value: s.id,
+                      label: s.semester,
+                    })) || []
+                  }
+                />
+                {errors.semesterId && touched.semesterId && (
+                  <div
+                    style={{
+                      color: "#ff4d4f",
+                      fontSize: "12px",
+                      marginTop: "4px",
+                    }}
+                  >
+                    {errors.semesterId}
+                  </div>
+                )}
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: "8px",
+                }}
               >
-                <option value="">Select Semester</option>
-                {semesters?.map((semester) => (
-                  <option key={semester.id} value={semester.id}>
-                    {semester.semester}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <DialogFooter>
-              <Button type="button" variant="secondary" onClick={handleCloseModal}>
-                Cancel
-              </Button>
-              <Button type="submit">
-                {editingCourse ? 'Update' : 'Create'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+                <Button onClick={handleCloseModal}>Cancel</Button>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={isSubmitting}
+                  disabled={!isValid || isSubmitting}
+                >
+                  {editingCourse ? "Update" : "Create"}
+                </Button>
+              </div>
+            </Form>
+          )}
+        </Formik>
+      </Modal>
     </div>
   );
 };

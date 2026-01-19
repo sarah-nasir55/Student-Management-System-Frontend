@@ -41,6 +41,7 @@ const validationSchema = Yup.object({
 });
 
 const Students = () => {
+  const [messageApi, contextHolder] = message.useMessage();
   const { data: students, isLoading, error } = useStudents();
   const { data: semesters } = useSemesters();
   const createStudent = useCreateStudent();
@@ -71,14 +72,14 @@ const Students = () => {
 
       if (editingStudent) {
         await updateStudent.mutateAsync({ id: editingStudent.id, data });
-        message.success("Student updated successfully!");
+        messageApi.success("Student updated successfully!");
       } else {
         await createStudent.mutateAsync(data);
-        message.success("Student created successfully!");
+        messageApi.success("Student created successfully!");
       }
       handleCloseModal();
     } catch (error) {
-      message.error("Error saving student. Please try again.");
+      messageApi.error("Error saving student. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -87,9 +88,9 @@ const Students = () => {
   const handleDelete = async (id) => {
     try {
       await deleteStudent.mutateAsync(id);
-      message.success("Student deleted successfully!");
+      messageApi.success("Student deleted successfully!");
     } catch (error) {
-      message.error("Error deleting student. Please try again.");
+      messageApi.error("Error deleting student. Please try again.");
     }
   };
 
@@ -174,7 +175,7 @@ const Students = () => {
   if (error)
     return (
       <div style={{ padding: "40px", textAlign: "center", color: "red" }}>
-        Error loading students: {error.message}
+        Error loading students: {error.messageApi}
       </div>
     );
 
@@ -187,6 +188,7 @@ const Students = () => {
 
   return (
     <div style={{ padding: "24px" }}>
+      {contextHolder}
       <div
         style={{
           display: "flex",
@@ -228,7 +230,14 @@ const Students = () => {
           onSubmit={handleSubmit}
           enableReinitialize={true}
         >
-          {({ values, errors, touched, isSubmitting, isValid, setFieldValue  }) => (
+          {({
+            values,
+            errors,
+            touched,
+            isSubmitting,
+            isValid,
+            setFieldValue,
+          }) => (
             <Form style={{ marginTop: "20px" }}>
               <div style={{ marginBottom: "16px" }}>
                 <label

@@ -15,6 +15,7 @@ const validationSchema = Yup.object({
 });
 
 const Enrollments = () => {
+  const [messageApi, contextHolder] = message.useMessage();
   const {
     data: enrollments,
     isLoading: enrollmentsLoading,
@@ -39,10 +40,10 @@ const Enrollments = () => {
     try {
       await createEnrollment.mutateAsync(values);
       handleCloseModal();
-      message.success("Enrollment created successfully!");
+      messageApi.success("Enrollment created successfully!");
     } catch (error) {
       console.error("Error creating enrollment:", error);
-      message.error("Error creating enrollment. Please try again.");
+      messageApi.error("Error creating enrollment. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -60,7 +61,7 @@ const Enrollments = () => {
   if (enrollmentsError)
     return (
       <div style={{ padding: "40px", textAlign: "center", color: "red" }}>
-        Error loading enrollments: {enrollmentsError.message}
+        Error loading enrollments: {enrollmentsError.messageApi}
       </div>
     );
 
@@ -90,6 +91,7 @@ const Enrollments = () => {
 
   return (
     <div style={{ padding: "24px" }}>
+      {contextHolder}
       <div
         style={{
           display: "flex",

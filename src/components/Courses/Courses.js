@@ -35,6 +35,7 @@ const validationSchema = Yup.object({
 });
 
 const Courses = () => {
+  const [messageApi, contextHolder] = message.useMessage();
   const { data: courses, isLoading, error } = useCourses();
   const { data: semesters } = useSemesters();
   const createCourse = useCreateCourse();
@@ -63,15 +64,15 @@ const Courses = () => {
 
       if (editingCourse) {
         await updateCourse.mutateAsync({ id: editingCourse.id, data });
-        message.success("Course updated successfully!");
+        messageApi.success("Course updated successfully!");
       } else {
         await createCourse.mutateAsync(data);
-        message.success("Course created successfully!");
+        messageApi.success("Course created successfully!");
       }
       handleCloseModal();
     } catch (error) {
       console.error("Error saving course:", error);
-      message.error("Error saving course. Please try again.");
+      messageApi.error("Error saving course. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -80,10 +81,10 @@ const Courses = () => {
   const handleDelete = async (id) => {
     try {
       await deleteCourse.mutateAsync(id);
-      message.success("Course deleted successfully!");
+      messageApi.success("Course deleted successfully!");
     } catch (error) {
       console.error("Error deleting course:", error);
-      message.error("Error deleting course. Please try again.");
+      messageApi.error("Error deleting course. Please try again.");
     }
   };
 
@@ -96,7 +97,7 @@ const Courses = () => {
   if (error)
     return (
       <div style={{ padding: "40px", textAlign: "center", color: "red" }}>
-        Error loading courses: {error.message}
+        Error loading courses: {error.messageApi}
       </div>
     );
 
@@ -163,6 +164,7 @@ const Courses = () => {
 
   return (
     <div style={{ padding: "24px" }}>
+      {contextHolder}
       <div
         style={{
           display: "flex",
